@@ -1,0 +1,12 @@
+// Add these two simple functions
+
+public PartTypesResponse getAllPartTypesFunction() {
+    return mobisApiService.getAllPartTypes();
+}
+
+public PartsResponse getPartsByTypeFunction(PartTypeRequest request) {
+    return mobisApiService.getPartsByType(request.typeId());
+}
+
+// Request record
+public record PartTypeRequest(Long typeId) {}
