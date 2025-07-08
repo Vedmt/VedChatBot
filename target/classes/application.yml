@@ -1,0 +1,36 @@
+hyundai:
+  mobis:
+    api:
+      base-url: https://api.hyundaimobisin.com
+      timeout: 30000
+    models:
+      - name: "All New Hyundai i20"
+        modelId: "27"
+        year: "2018"
+      - name: "Kona"
+        modelId: "33"
+        year: "2018"
+      - name: "IONIQ 5"
+        modelId: "32"
+        year: "2018"
+      - name: "New Venue"
+        modelId: "20"
+        year: "2018"
+      - name: "Tucson"
+        modelId: "30"
+        year: "2018"
+      - name: "Venue N Line"
+        modelId: "22"
+        year: "2018"
+      - name: "Aura"
+        modelId: "24"
+        year: "2018"
+      - name: "New Grand i10 Nios"
+        modelId: "25"
+        year: "2018"
+      - name: "All-new Verna"
+        modelId: "23"
+        year: "2018"
+      - name: "Exter"
+        modelId: "26"
+        year: "2018"

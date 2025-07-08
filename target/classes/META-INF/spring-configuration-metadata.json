@@ -1,0 +1,38 @@
+{
+  "groups": [
+    {
+      "name": "hyundai.mobis",
+      "type": "com.hyundai.mobis.config.HyundaiMobisConfig",
+      "sourceType": "com.hyundai.mobis.config.HyundaiMobisConfig"
+    },
+    {
+      "name": "hyundai.mobis.api",
+      "type": "com.hyundai.mobis.config.HyundaiMobisConfig$Api",
+      "sourceType": "com.hyundai.mobis.config.HyundaiMobisConfig",
+      "sourceMethod": "getApi()"
+    }
+  ],
+  "properties": [
+    {
+      "name": "hyundai.mobis.api.base-url",
+      "type": "java.lang.String",
+      "sourceType": "com.hyundai.mobis.config.HyundaiMobisConfig$Api"
+    },
+    {
+      "name": "hyundai.mobis.api.timeout",
+      "type": "java.lang.Integer",
+      "sourceType": "com.hyundai.mobis.config.HyundaiMobisConfig$Api"
+    },
+    {
+      "name": "hyundai.mobis.model-names",
+      "type": "java.util.List<java.lang.String>",
+      "sourceType": "com.hyundai.mobis.config.HyundaiMobisConfig"
+    },
+    {
+      "name": "hyundai.mobis.models",
+      "type": "java.util.List<com.hyundai.mobis.config.HyundaiMobisConfig$Model>",
+      "sourceType": "com.hyundai.mobis.config.HyundaiMobisConfig"
+    }
+  ],
+  "hints": []
+}
