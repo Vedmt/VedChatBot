@@ -1,0 +1,92 @@
+version: '3.8'
+
+services:
+  # Redis for caching
+  redis:
+    image: redis:7-alpine
+    container_name: mobis-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - mobis-network
+
+  # PostgreSQL database (production)
+  postgres:
+    image: postgres:15-alpine
+    container_name: mobis-postgres
+    environment:
+      POSTGRES_DB: mobis_chatbot
+      POSTGRES_USER: mobis_user
+      POSTGRES_PASSWORD: mobis_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - mobis-network
+
+  # Mobis Chatbot Application
+  mobis-chatbot:
+    build: .
+    container_name: mobis-chatbot-app
+    ports:
+      - "8080:8080"
+    environment:
+      # Database Configuration
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/mobis_chatbot
+      SPRING_DATASOURCE_USERNAME: mobis_user
+      SPRING_DATASOURCE_PASSWORD: mobis_password
+      
+      # Redis Configuration
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      
+      # AI Configuration (Set these in your .env file)
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      
+      # Security
+      JWT_SECRET: ${JWT_SECRET:-mobis-default-secret-change-in-production}
+      
+      # JPA Configuration
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_JPA_SHOW_SQL: false
+      
+      # Mobis API Configuration
+      MOBIS_API_BASE_URL: https://api.hyundaimobis.com
+      MOBIS_API_TIMEOUT: 30000
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - mobis-network
+    restart: unless-stopped
+
+  # Nginx for reverse proxy (optional)
+  nginx:
+    image: nginx:alpine
+    container_name: mobis-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - mobis-chatbot
+    networks:
+      - mobis-network
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+    driver: local
+  postgres_data:
+    driver: local
+
+networks:
+  mobis-network:
+    driver: bridge 

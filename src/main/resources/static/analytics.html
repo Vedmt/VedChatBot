@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chatbot Analytics Dashboard</title>
+    <link
+      href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+      :root {
+        --primary-blue: #3b82f6;
+        --secondary-blue: #1e40af;
+        --light-blue: #dbeafe;
+        --success-green: #10b981;
+        --warning-yellow: #f59e0b;
+        --danger-red: #ef4444;
+      }
+
+      .gradient-bg {
+        background: linear-gradient(
+          135deg,
+          var(--primary-blue),
+          var(--secondary-blue)
+        );
+      }
+
+      .card {
+        transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+      }
+
+      .card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+      }
+
+      .stat-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      }
+
+      .chart-container {
+        position: relative;
+        height: 300px;
+      }
+    </style>
+  </head>
+  <body class="bg-gray-50 min-h-screen">
+    <!-- Header -->
+    <header class="gradient-bg text-white shadow-lg">
+      <div class="container mx-auto px-6 py-4">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center space-x-4">
+            <div
+              class="w-10 h-10 bg-white rounded-full flex items-center justify-center"
+            >
+              <i class="fas fa-chart-bar text-blue-600 text-xl"></i>
+            </div>
+            <div>
+              <h1 class="text-2xl font-bold">Analytics Dashboard</h1>
+              <p class="text-blue-100 text-sm">
+                Chatbot Performance & Usage Statistics
+              </p>
+            </div>
+          </div>
+          <div class="flex space-x-4">
+            <a
+              href="/"
+              class="bg-white bg-opacity-20 hover:bg-opacity-30 px-4 py-2 rounded-lg transition-colors"
+            >
+              <i class="fas fa-comments mr-2"></i>Back to Chat
+            </a>
+            <button
+              onclick="refreshData()"
+              class="bg-white bg-opacity-20 hover:bg-opacity-30 px-4 py-2 rounded-lg transition-colors"
+            >
+              <i class="fas fa-refresh mr-2"></i>Refresh
+            </button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="container mx-auto px-6 py-8">
+      <!-- Loading Indicator -->
+      <div id="loading" class="text-center py-8">
+        <div
+          class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"
+        ></div>
+        <p class="mt-2 text-gray-600">Loading analytics...</p>
+      </div>
+
+      <!-- Dashboard Content -->
+      <div id="dashboard" class="hidden">
+        <!-- Stats Overview -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div class="card bg-white rounded-xl shadow-md p-6">
+            <div class="flex items-center">
+              <div
+                class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center"
+              >
+                <i class="fas fa-users text-blue-600 text-xl"></i>
+              </div>
+              <div class="ml-4">
+                <p class="text-sm font-medium text-gray-600">Total Users</p>
+                <p class="text-2xl font-bold text-gray-900" id="totalUsers">
+                  0
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div class="card bg-white rounded-xl shadow-md p-6">
+            <div class="flex items-center">
+              <div
+                class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center"
+              >
+                <i class="fas fa-comment-dots text-green-600 text-xl"></i>
+              </div>
+              <div class="ml-4">
+                <p class="text-sm font-medium text-gray-600">Conversations</p>
+                <p
+                  class="text-2xl font-bold text-gray-900"
+                  id="totalConversations"
+                >
+                  0
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div class="card bg-white rounded-xl shadow-md p-6">
+            <div class="flex items-center">
+              <div
+                class="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center"
+              >
+                <i class="fas fa-message text-yellow-600 text-xl"></i>
+              </div>
+              <div class="ml-4">
+                <p class="text-sm font-medium text-gray-600">Total Messages</p>
+                <p class="text-2xl font-bold text-gray-900" id="totalMessages">
+                  0
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div class="card bg-white rounded-xl shadow-md p-6">
+            <div class="flex items-center">
+              <div
+                class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center"
+              >
+                <i class="fas fa-car text-purple-600 text-xl"></i>
+              </div>
+              <div class="ml-4">
+                <p class="text-sm font-medium text-gray-600">Popular Brand</p>
+                <p class="text-2xl font-bold text-gray-900" id="topBrand">-</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Charts Row -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+          <!-- Popular Brands Chart -->
+          <div class="card bg-white rounded-xl shadow-md p-6">
+            <div class="flex items-center justify-between mb-6">
+              <h3 class="text-lg font-semibold text-gray-900">
+                Most Searched Car Brands
+              </h3>
+              <i class="fas fa-chart-pie text-gray-400"></i>
+            </div>
+            <div class="chart-container">
+              <canvas id="brandsChart"></canvas>
+            </div>
+          </div>
+
+          <!-- Function Usage Chart -->
+          <div class="card bg-white rounded-xl shadow-md p-6">
+            <div class="flex items-center justify-between mb-6">
+              <h3 class="text-lg font-semibold text-gray-900">Feature Usage</h3>
+              <i class="fas fa-chart-bar text-gray-400"></i>
+            </div>
+            <div class="chart-container">
+              <canvas id="functionsChart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Conversation Timeline -->
+        <div class="card bg-white rounded-xl shadow-md p-6 mb-8">
+          <div class="flex items-center justify-between mb-6">
+            <h3 class="text-lg font-semibold text-gray-900">
+              Conversation Timeline
+            </h3>
+            <i class="fas fa-chart-line text-gray-400"></i>
+          </div>
+          <div class="chart-container">
+            <canvas id="timelineChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Chat History Table -->
+        <div class="card bg-white rounded-xl shadow-md p-6">
+          <div class="flex items-center justify-between mb-6">
+            <h3 class="text-lg font-semibold text-gray-900">
+              Recent Chat History
+            </h3>
+            <div class="flex space-x-2">
+              <input
+                type="text"
+                id="searchInput"
+                placeholder="Search chats..."
+                class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <button
+                onclick="searchChats()"
+                class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                <i class="fas fa-search"></i>
+              </button>
+            </div>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th
+                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Time
+                  </th>
+                  <th
+                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Session
+                  </th>
+                  <th
+                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    User Message
+                  </th>
+                  <th
+                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Function Used
+                  </th>
+                </tr>
+              </thead>
+              <tbody
+                id="chatHistoryTable"
+                class="bg-white divide-y divide-gray-200"
+              >
+                <!-- Chat history will be populated here -->
+              </tbody>
+            </table>
+          </div>
+          <div class="mt-4 flex justify-between items-center">
+            <p class="text-sm text-gray-600">
+              Showing <span id="showingCount">0</span> of
+              <span id="totalCount">0</span> messages
+            </p>
+            <div class="flex space-x-2">
+              <button
+                onclick="loadChatHistory(currentPage - 1)"
+                id="prevBtn"
+                class="px-3 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors disabled:opacity-50"
+              >
+                Previous
+              </button>
+              <span class="px-3 py-2 text-gray-700"
+                >Page <span id="currentPageSpan">1</span></span
+              >
+              <button
+                onclick="loadChatHistory(currentPage + 1)"
+                id="nextBtn"
+                class="px-3 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors disabled:opacity-50"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <script src="js/analytics.js"></script>
+  </body>
+</html>
