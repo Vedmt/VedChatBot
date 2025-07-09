@@ -70,16 +70,16 @@ public class EnquirySubmissionService {
         return String.format("ENQ-%s-%s", dateStr, randomStr);
     }
 
-    public boolean checkDuplicateEnquiry(String email, String mobile, String itemId, String itemType) {
+    public boolean checkDuplicateEnquiry(String email, String mobileNo, String itemId, String itemType) {
         LocalDateTime twentyFourHoursAgo = LocalDateTime.now().minusHours(24);
         
         if ("accessory".equals(itemType)) {
             return enquiryRepository.existsByEmailAndMobileNoAndAccessoryIdAndItemTypeAndCreatedAtAfter(
-                email, mobile, itemId, itemType, twentyFourHoursAgo
+                email, mobileNo, itemId, itemType, twentyFourHoursAgo
             );
         } else if ("part".equals(itemType)) {
             return enquiryRepository.existsByEmailAndMobileNoAndPartIdAndItemTypeAndCreatedAtAfter(
-                email, mobile, itemId, itemType, twentyFourHoursAgo
+                email, mobileNo, itemId, itemType, twentyFourHoursAgo
             );
         }
         

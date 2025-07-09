@@ -21,7 +21,8 @@
     {
       "name": "hyundai.mobis.api.timeout",
       "type": "java.lang.Integer",
-      "sourceType": "com.hyundai.mobis.config.HyundaiMobisConfig$Api"
+      "sourceType": "com.hyundai.mobis.config.HyundaiMobisConfig$Api",
+      "defaultValue": 0
     },
     {
       "name": "hyundai.mobis.model-names",

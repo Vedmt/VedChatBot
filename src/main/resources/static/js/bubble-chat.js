@@ -85,6 +85,7 @@ class BubbleChatbot {
       question: "What would you like to explore?",
       options: [
         "Browse Accessories",
+        "Browse Parts",
         "Find Dealers & Distributors",
         "Check Current Offers",
         "Get Product Support",

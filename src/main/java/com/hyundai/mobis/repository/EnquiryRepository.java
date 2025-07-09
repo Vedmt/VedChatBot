@@ -15,15 +15,7 @@ public interface EnquiryRepository extends JpaRepository<EnquiryEntity, Long> {
     
     List<EnquiryEntity> findBySessionId(String sessionId);
     
-    List<EnquiryEntity> findByCustomerEmailOrMobileNo(String email, String mobileNo);
-
-    boolean existsByEmailAndMobileAndItemIdAndItemTypeAndCreatedAtAfter(
-    String email, 
-    String mobile, 
-    String itemId, 
-    String itemType, 
-    LocalDateTime createdAt
-    );
+    List<EnquiryEntity> findByEmailOrMobileNo(String email, String mobileNo);
 
     // Check for duplicate accessory enquiry
     boolean existsByEmailAndMobileNoAndAccessoryIdAndItemTypeAndCreatedAtAfter(
