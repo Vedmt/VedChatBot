@@ -10,6 +10,8 @@ import com.hyundai.mobis.dto.MobisAccessoriesResponse;
 import com.hyundai.mobis.dto.AccessoryTypesResponse;
 import com.hyundai.mobis.dto.AccessorySubTypesResponse;
 import com.hyundai.mobis.dto.StatesResponse;
+import com.hyundai.mobis.dto.DistributorInfo;
+import org.springframework.core.ParameterizedTypeReference;
 import com.hyundai.mobis.functions.MobisApiFunctions.OffersRequest;
 import com.hyundai.mobis.functions.MobisApiFunctions.OffersResponse;
 import com.hyundai.mobis.functions.MobisApiFunctions.WarrantyCheckRequest;
@@ -58,6 +60,94 @@ public class MobisApiService {
         restTemplate.setRequestFactory(factory);
     }
 
+    // Get states for dealers
+    public List<StateInfo> getDealerStates() {
+        try {
+            ResponseEntity<List<StateInfo>> response = restTemplate.exchange(
+                baseUrl + "/service/parts/getStates",
+                HttpMethod.GET,
+                null,
+                new ParameterizedTypeReference<List<StateInfo>>() {}
+            );
+            return response.getBody();
+        } catch (Exception e) {
+            log.error("Error fetching dealer states", e);
+            return new ArrayList<>();
+        }
+    }
+    
+    // Get states for distributors
+    public List<StateInfo> getDistributorStates() {
+        try {
+            ResponseEntity<List<StateInfo>> response = restTemplate.exchange(
+                baseUrl + "/service/parts/getDistributorStates",
+                HttpMethod.GET,
+                null,
+                new ParameterizedTypeReference<List<StateInfo>>() {}
+            );
+            return response.getBody();
+        } catch (Exception e) {
+            log.error("Error fetching distributor states", e);
+            return new ArrayList<>();
+        }
+    }
+    
+    // Get cities for a state
+    public List<CityInfo> getCities(String stateId, String dealerCategory) {
+        try {
+            String url = String.format("%s/service/parts/getCities?dealerCategory=%s&stateId=%s",
+                baseUrl, dealerCategory, stateId);
+                
+            ResponseEntity<List<CityInfo>> response = restTemplate.exchange(
+                url,
+                HttpMethod.GET,
+                null,
+                new ParameterizedTypeReference<List<CityInfo>>() {}
+            );
+            return response.getBody();
+        } catch (Exception e) {
+            log.error("Error fetching cities for state: " + stateId, e);
+            return new ArrayList<>();
+        }
+    }
+    
+    // Get dealers for a city
+    public List<DealerInfo> getDealers(String cityId, String dealerCategoryId) {
+        try {
+            String url = String.format("%s/service/accessories/getDealers?cityId=%s&dealerCategoryId=%s",
+                baseUrl, cityId, dealerCategoryId);
+                
+            ResponseEntity<List<DealerInfo>> response = restTemplate.exchange(
+                url,
+                HttpMethod.GET,
+                null,
+                new ParameterizedTypeReference<List<DealerInfo>>() {}
+            );
+            return response.getBody();
+        } catch (Exception e) {
+            log.error("Error fetching dealers for city: " + cityId, e);
+            return new ArrayList<>();
+        }
+    }
+    
+    // Get distributors for a state
+    public List<DistributorInfo> getDistributorsByState(String stateId) {
+        try {
+            String url = String.format("%s/service/accessories/getByState?stateId=%s", baseUrl, stateId);
+            
+            ResponseEntity<List<DistributorInfo>> response = restTemplate.exchange(
+                url,
+                HttpMethod.GET,
+                null,
+                new ParameterizedTypeReference<List<DistributorInfo>>() {}
+            );
+            return response.getBody();
+        } catch (Exception e) {
+            log.error("Error fetching distributors for state: " + stateId, e);
+            return new ArrayList<>();
+        }
+    }
+    
     // New methods for type/subtype categorization
     public AccessoryTypesForModelResponse getAccessoryTypesForModel(String modelName) {
         try {
