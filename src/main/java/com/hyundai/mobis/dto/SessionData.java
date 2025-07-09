@@ -16,6 +16,10 @@ public class SessionData {
     private List<AccessoryInfo> accessoriesList;
     private Map<String, AccessoryTypeInfo> typeInfoMap;
     private Map<String, AccessorySubTypeInfo> subTypeInfoMap;
+    private boolean showingParts;
+private int partsCount;
+private List<PartInfo> partsList;
+private Map<String, PartTypeInfo> partTypeInfoMap;
     // Flow tracking
     private boolean isAccessoryFlow;
     private String flowStage; // "MODEL", "TYPE", "SUBTYPE", "PRODUCT", etc.
@@ -43,6 +47,59 @@ public class SessionData {
         this.sessionId = sessionId;
     }
     
+    public boolean isShowingParts() {
+        return showingParts;
+    }
+    
+    public void setShowingParts(boolean showingParts) {
+        this.showingParts = showingParts;
+    }
+    
+    public int getPartsCount() {
+        return partsCount;
+    }
+    
+    public void setPartsCount(int count) {
+        this.partsCount = count;
+    }
+    
+    public PartInfo getPartByIndex(int index) {
+        if (partsList != null && index >= 0 && index < partsList.size()) {
+            return partsList.get(index);
+        }
+        return null;
+    }
+    
+    public void clearPartsList() {
+        if (partsList != null) {
+            partsList.clear();
+        }
+    }
+    
+    public void addPartToList(PartInfo part) {
+        if (partsList == null) {
+            partsList = new ArrayList<>();
+        }
+        partsList.add(part);
+    }
+    
+    public void clearPartTypeInfoMap() {
+        if (partTypeInfoMap != null) {
+            partTypeInfoMap.clear();
+        }
+    }
+    
+    public void addPartTypeInfo(String typeName, PartTypeInfo typeInfo) {
+        if (partTypeInfoMap == null) {
+            partTypeInfoMap = new HashMap<>();
+        }
+        partTypeInfoMap.put(typeName, typeInfo);
+    }
+    
+    public PartTypeInfo getPartTypeInfo(String typeName) {
+        return partTypeInfoMap != null ? partTypeInfoMap.get(typeName) : null;
+    }
+
     // Helper methods
     public void clearEnquiryForm() {
         this.enquiryForm = null;

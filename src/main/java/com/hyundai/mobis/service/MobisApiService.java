@@ -396,6 +396,91 @@ public class MobisApiService {
         }
     }
 
+    // Add these methods to MobisApiService class
+
+@Cacheable(value = "partTypes", key = "'all'")
+public PartTypesResponse getAllPartTypes() {
+    try {
+        String url = config.getApi().getBaseUrl() + "/service/parts/findAllTypes";
+        ResponseEntity<Map[]> response = restTemplate.getForEntity(url, Map[].class);
+        
+        if (response.getBody() != null) {
+            List<PartTypeInfo> types = Arrays.stream(response.getBody())
+                .map(map -> new PartTypeInfo(
+                    ((Number) map.get("id")).longValue(),
+                    (String) map.get("description"),
+                    (String) map.get("code")
+                ))
+                .collect(Collectors.toList());
+            
+            return new PartTypesResponse(types, true, "Success");
+        }
+        return new PartTypesResponse(List.of(), false, "No types found");
+    } catch (Exception e) {
+        logger.error("Error fetching part types: {}", e.getMessage());
+        return createMockPartTypesResponse();
+    }
+}
+
+@Cacheable(value = "partsByType", key = "#typeId")
+public PartsResponse getPartsByType(Long typeId) {
+    try {
+        // Using modelId=1 and year=2018 as default
+        String url = config.getApi().getBaseUrl() + "/service/parts/getByModelIdAndYear?modelId=1&year=2018";
+        ResponseEntity<Map[]> response = restTemplate.getForEntity(url, Map[].class);
+        
+        if (response.getBody() != null) {
+            List<PartInfo> parts = Arrays.stream(response.getBody())
+                .filter(map -> {
+                    Number partTypeId = (Number) map.get("typeId");
+                    return partTypeId != null && partTypeId.longValue() == typeId;
+                })
+                .map(map -> new PartInfo(
+                    ((Number) map.get("partId")).longValue(),
+                    (String) map.get("partName"),
+                    (String) map.get("partCode"),
+                    cleanHtml((String) map.get("body")),
+                    typeId
+                ))
+                .collect(Collectors.toList());
+            
+            return new PartsResponse(parts, parts.size(), true, "Success");
+        }
+        return new PartsResponse(List.of(), 0, false, "No parts found");
+    } catch (Exception e) {
+        logger.error("Error fetching parts: {}", e.getMessage());
+        return new PartsResponse(List.of(), 0, false, "Error: " + e.getMessage());
+    }
+}
+
+// Response DTOs for parts
+public record PartTypeInfo(Long typeId, String typeName, String code) {}
+public record PartTypesResponse(List<PartTypeInfo> types, boolean success, String message) {}
+public record PartInfo(Long partId, String partName, String partCode, String description, Long typeId) {}
+public record PartsResponse(List<PartInfo> parts, int count, boolean success, String message) {}
+
+// Helper method for HTML cleaning (if not already present)
+private String cleanHtml(String html) {
+    if (html == null) return "";
+    return html.replaceAll("<[^>]*>", "")
+               .replaceAll("\\s+", " ")
+               .trim();
+}
+
+// Add mock method for part types
+private PartTypesResponse createMockPartTypesResponse() {
+    List<PartTypeInfo> types = Arrays.asList(
+        new PartTypeInfo(1L, "Engine Parts", "ENGINE"),
+        new PartTypeInfo(2L, "Brake System", "BRAKE"),
+        new PartTypeInfo(3L, "Electrical Parts", "ELECTRIC"),
+        new PartTypeInfo(4L, "Body Parts", "BODY"),
+        new PartTypeInfo(5L, "Suspension", "SUSPENSION"),
+        new PartTypeInfo(6L, "Clutch System", "CLUTCH")
+    );
+    
+    return new PartTypesResponse(types, true, "Success");
+}
+    
     // All mock data creation methods remain the same
     private PartSearchResponse createMockPartSearchResponse(PartSearchRequest request) {
         List<PartSearchResponse.Part> parts = Arrays.asList(

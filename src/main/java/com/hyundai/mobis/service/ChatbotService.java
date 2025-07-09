@@ -95,6 +95,19 @@ public class ChatbotService {
                 return enquiryFlowHandler.handleEnquiryFlow(session, request.getMessage());
             }
             
+// Check if user selected a part by number for enquiry
+if (session.isShowingParts() && userMessage.matches("^\\d+$")) {
+    int selection = Integer.parseInt(userMessage);
+    if (selection > 0 && selection <= session.getPartsCount()) {
+        SessionData.PartInfo selectedPart = session.getPartByIndex(selection - 1);
+        if (selectedPart != null) {
+            session.setSelectedPart(selectedPart);
+            session.setShowingParts(false);
+            return enquiryFlowHandler.handleEnquiryFlow(session, "enquire");
+        }
+    }
+}
+
             // Check if user selected an accessory by number for enquiry
             if (session.isShowingAccessories() && userMessage.matches("^\\d+$")) {
                 int selection = Integer.parseInt(userMessage);
@@ -114,7 +127,7 @@ public class ChatbotService {
                     return enquiryFlowHandler.handleEnquiryFlow(session, "enquire");
                 } else {
                     return createErrorResponse(request.getSessionId(), 
-                        "Please select an accessory first before making an enquiry.");
+                        "Please select an accessory or part first before making an enquiry.");
                 }
             }
 
@@ -130,6 +143,9 @@ public class ChatbotService {
                 } else if (lastState.equals("awaiting_type_selection")) {
                     session.setCurrentState(null);
                     return handleTypeSelection(session, request.getMessage());
+                } else if (lastState.equals("awaiting_part_type_selection")) {
+                    session.setCurrentState(null);
+                    return handlePartTypeSelection(session, request.getMessage());
                 } else if (lastState.equals("awaiting_subtype_selection")) {
                     session.setCurrentState(null);
                     return handleSubTypeSelection(session, request.getMessage());
@@ -182,10 +198,11 @@ public class ChatbotService {
         response.setSessionId(session.getSessionId());
         response.setSuccess(true);
         response.setTimestamp(LocalDateTime.now());
-        response.setMessage("Hello! I'm your Hyundai Mobis Genuine Accessories assistant. I can help you explore genuine accessories for your Hyundai vehicle and find the best prices.");
+        response.setMessage("Hello! I'm your Hyundai Mobis assistant. I can help you explore genuine accessories and parts for your Hyundai vehicle and find the best prices.");
         response.setQuestion("What would you like to explore?");
         response.setOptions(Arrays.asList(
                 "Browse Accessories",
+                "Browse Parts",
                 "Find Dealers & Distributors",
                 "Check Current Offers",
                 "Get Product Support"
@@ -212,7 +229,11 @@ public class ChatbotService {
         if (userMessage.equalsIgnoreCase("Browse Accessories")) {
             session.setCurrentState("awaiting_vehicle_selection");
             return createVehicleSelectionResponse(session);
-        } else if (userMessage.equalsIgnoreCase("Find Dealers & Distributors")) {
+        }  else if (userMessage.equalsIgnoreCase("Browse Parts")) {
+            session.setCurrentState("awaiting_part_type_selection");
+            session.setIsAccessoryFlow(false);  // Mark this as parts flow
+            return createPartsTypesResponse(session);
+    }else if (userMessage.equalsIgnoreCase("Find Dealers & Distributors")) {
             session.setCurrentState("awaiting_location_selection");
             return createLocationSelectionResponse(session);
         } else if (userMessage.equalsIgnoreCase("Check Current Offers")) {
@@ -238,11 +259,15 @@ public class ChatbotService {
                 session.setCurrentState("awaiting_vehicle_selection");
                 return createVehicleSelectionResponse(session);
             case 2:
+                session.setCurrentState("awaiting_part_type_selection");
+                session.setIsAccessoryFlow(false);
+                return createPartsTypesResponse(session);
+            case 3:
                 session.setCurrentState("awaiting_location_selection");
                 return createLocationSelectionResponse(session);
-            case 3:
-                return createOffersResponse(session);
             case 4:
+                return createOffersResponse(session);
+            case 5:
                 return createProductSupportResponse(session);
             default:
                 return createInvalidSelectionResponse(session);
@@ -746,8 +771,10 @@ public class ChatbotService {
     private ChatResponse handleNavigationOption(SessionData session, String option) {
         if (option.equalsIgnoreCase("Browse Another Category")) {
             SessionData.ModelInfo model = session.getSelectedModel();
-            if (model != null) {
+            if (model != null && session.isAccessoryFlow()) {
                 return createTypeSelectionResponse(session, model.getName());
+            } else if (!session.isAccessoryFlow()) {
+                return createPartsTypesResponse(session);
             }
         } else if (option.equalsIgnoreCase("Start over")) {
             // Clear session state
@@ -823,4 +850,134 @@ public class ChatbotService {
         }
         return Collections.emptyMap();
     }
+
+    // Parts flow methods
+private String getPartCategoryIcon(String category) {
+    String cat = category.toLowerCase();
+    if (cat.contains("engine")) return "🔧";
+    if (cat.contains("brake")) return "🛑";
+    if (cat.contains("electric")) return "⚡";
+    if (cat.contains("body")) return "🚗";
+    if (cat.contains("suspension")) return "🏎️";
+    if (cat.contains("clutch")) return "⚙️";
+    return "🔩";
+}
+
+private ChatResponse createPartsTypesResponse(SessionData session) {
+    try {
+        logger.info("API CALL: getAllPartTypesFunction");
+        var partTypes = mobisApiService.getAllPartTypes();
+        
+        if (!partTypes.success() || partTypes.types().isEmpty()) {
+            return createErrorResponse(session.getSessionId(), "Unable to fetch parts categories.");
+        }
+        
+        StringBuilder message = new StringBuilder();
+        message.append("🔧 **Genuine Hyundai Parts Categories**\n\n");
+        message.append("Select a category to view available parts:\n\n");
+        
+        List<String> options = new ArrayList<>();
+        session.clearPartTypeInfoMap(); // Add this method to SessionData
+        
+        for (var type : partTypes.types()) {
+            String icon = getPartCategoryIcon(type.typeName());
+            message.append(String.format("%s **%s**\n", icon, type.typeName()));
+            options.add(type.typeName());
+            
+            // Store part type info in session
+            SessionData.PartTypeInfo typeInfo = new SessionData.PartTypeInfo();
+            typeInfo.setId(type.typeId());
+            typeInfo.setName(type.typeName());
+            typeInfo.setDescription(type.code());
+            session.addPartTypeInfo(type.typeName(), typeInfo);
+        }
+        
+        session.setCurrentState("awaiting_part_type_selection");
+        
+        ChatResponse response = new ChatResponse();
+        response.setSessionId(session.getSessionId());
+        response.setSuccess(true);
+        response.setTimestamp(LocalDateTime.now());
+        response.setMessage(message.toString());
+        response.setQuestion("Select parts category:");
+        response.setOptions(options);
+        response.setConversationEnd(false);
+        response.setConversationType("part_types");
+        
+        saveChatMessage(session.getSessionId(), "Parts type selection", message.toString(), "getAllPartTypesFunction", null);
+        return response;
+    } catch (Exception e) {
+        logger.error("Error getting part types: {}", e.getMessage());
+        return createErrorResponse(session.getSessionId(), "Error loading parts categories");
+    }
+}
+
+private ChatResponse handlePartTypeSelection(SessionData session, String selectedType) {
+    try {
+        SessionData.PartTypeInfo typeInfo = session.getPartTypeInfo(selectedType);
+        
+        if (typeInfo == null) {
+            return createErrorResponse(session.getSessionId(), "Invalid selection. Please try again.");
+        }
+        
+        session.setSelectedPartType(typeInfo);
+        
+        logger.info("API CALL: getPartsByTypeFunction (typeId: {})", typeInfo.getId());
+        var partsResponse = mobisApiService.getPartsByType(typeInfo.getId());
+        
+        StringBuilder message = new StringBuilder();
+        message.append(String.format("🔧 **%s Parts**\n\n", selectedType));
+        
+        if (partsResponse.parts().isEmpty()) {
+            message.append("No parts available in this category.");
+            session.setShowingParts(false);
+            session.clearPartsList();
+        } else {
+            message.append(String.format("Found %d parts:\n\n", partsResponse.parts().size()));
+            
+            int index = 1;
+            session.clearPartsList(); // Clear previous parts
+            
+            for (var part : partsResponse.parts()) {
+                message.append(String.format("%d. 🔩 **%s**\n", index++, part.partName()));
+                message.append(String.format("   📝 %s\n", part.description()));
+                message.append(String.format("   🔧 Part Code: %s\n\n", part.partCode()));
+                
+                // Store part info in session
+                SessionData.PartInfo info = new SessionData.PartInfo();
+                info.setId(part.partId());
+                info.setName(part.partName());
+                info.setPartNumber(part.partCode());
+                info.setDescription(part.description());
+                session.addPartToList(info);
+            }
+            
+            session.setShowingParts(true);
+            session.setPartsCount(partsResponse.parts().size());
+            
+            message.append("\n⚠️ **Note**: Parts prices vary by dealer. Contact your nearest dealer for pricing.\n");
+            message.append("\n📝 **To enquire about any part, type the number (e.g., '1' for the first item)**");
+        }
+        
+        ChatResponse response = new ChatResponse();
+        response.setSessionId(session.getSessionId());
+        response.setSuccess(true);
+        response.setTimestamp(LocalDateTime.now());
+        response.setMessage(message.toString());
+        response.setQuestion("What would you like to do?");
+        response.setOptions(Arrays.asList(
+            "Browse Another Category",
+            "Find Nearest Dealer",
+            "Start over"
+        ));
+        response.setConversationEnd(false);
+        response.setConversationType("parts_list");
+        
+        saveChatMessage(session.getSessionId(), "Parts display", message.toString(), "getPartsByTypeFunction", null);
+        return response;
+    } catch (Exception e) {
+        logger.error("Error handling part type selection: {}", e.getMessage());
+        return createErrorResponse(session.getSessionId(), "Error loading parts");
+    }
+}
 }

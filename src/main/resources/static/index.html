@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AI Assistant - Bubble Chat</title>
+    <title>Hyundai Mobis AI Assistant - Accessories & Parts</title>
     <link
       href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css"
       rel="stylesheet"
@@ -14,12 +14,14 @@
     />
     <style>
       :root {
-        --primary-blue: #3b82f6;
-        --secondary-blue: #1e40af;
-        --light-blue: #dbeafe;
-        --bubble-blue: #eff6ff;
+        --primary-blue: #002c5f;
+        --secondary-blue: #0054a6;
+        --light-blue: #e8f2ff;
+        --bubble-blue: #f0f7ff;
         --text-dark: #1f2937;
         --text-light: #6b7280;
+        --success-green: #10b981;
+        --warning-yellow: #f59e0b;
       }
 
       .chat-container {
@@ -32,20 +34,113 @@
         animation: fadeInUp 0.4s ease-out;
       }
 
-      .option-bubble {
+      .option-bubble,
+      .action-button {
         transition: all 0.2s ease;
         cursor: pointer;
         border: 2px solid transparent;
       }
 
-      .option-bubble:hover {
+      .option-bubble:hover,
+      .action-button:hover {
         transform: translateY(-2px);
         box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
         border-color: var(--primary-blue);
       }
 
-      .option-bubble:active {
+      .option-bubble:active,
+      .action-button:active {
         transform: translateY(0);
+      }
+
+      /* Form styles for enquiry */
+      .form-input {
+        width: 100%;
+        padding: 0.5rem 1rem;
+        border: 2px solid #e5e7eb;
+        border-radius: 0.5rem;
+        margin-top: 0.5rem;
+        transition: all 0.2s;
+      }
+
+      .form-input:focus {
+        outline: none;
+        border-color: var(--primary-blue);
+        box-shadow: 0 0 0 3px rgba(0, 44, 95, 0.1);
+      }
+
+      .form-label {
+        font-weight: 600;
+        color: var(--text-dark);
+        font-size: 0.875rem;
+      }
+
+      /* Navigation buttons */
+      .nav-button {
+        padding: 0.5rem 1rem;
+        border-radius: 0.5rem;
+        font-weight: 500;
+        transition: all 0.2s;
+      }
+
+      .nav-button-primary {
+        background-color: var(--primary-blue);
+        color: white;
+      }
+
+      .nav-button-secondary {
+        background-color: #f3f4f6;
+        color: var(--text-dark);
+      }
+
+      /* Enquiry form review */
+      .review-section {
+        background-color: #f9fafb;
+        padding: 1rem;
+        border-radius: 0.5rem;
+        margin-bottom: 0.5rem;
+      }
+
+      .review-label {
+        font-weight: 600;
+        color: var(--text-light);
+        font-size: 0.75rem;
+        text-transform: uppercase;
+      }
+
+      .review-value {
+        color: var(--text-dark);
+        margin-top: 0.25rem;
+      }
+
+      /* Numbered list for accessories/parts */
+      .numbered-item {
+        border-left: 3px solid var(--primary-blue);
+        padding-left: 1rem;
+        margin-bottom: 1rem;
+      }
+
+      .item-number {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 2rem;
+        height: 2rem;
+        background-color: var(--primary-blue);
+        color: white;
+        border-radius: 50%;
+        font-weight: bold;
+        margin-right: 0.5rem;
+      }
+
+      /* Part number badge */
+      .part-number {
+        background-color: #f3f4f6;
+        color: #374151;
+        padding: 0.25rem 0.5rem;
+        border-radius: 0.25rem;
+        font-family: monospace;
+        font-size: 0.875rem;
       }
 
       @keyframes fadeInUp {
@@ -106,6 +201,29 @@
         backdrop-filter: blur(10px);
         border: 1px solid rgba(255, 255, 255, 0.2);
       }
+
+      /* Success message */
+      .success-message {
+        background-color: #d1fae5;
+        border: 1px solid #10b981;
+        color: #065f46;
+        padding: 1rem;
+        border-radius: 0.5rem;
+        margin-bottom: 1rem;
+      }
+
+      /* Reference number display */
+      .reference-number {
+        font-family: monospace;
+        font-size: 1.25rem;
+        font-weight: bold;
+        color: var(--primary-blue);
+        background-color: var(--light-blue);
+        padding: 0.5rem 1rem;
+        border-radius: 0.5rem;
+        display: inline-block;
+        margin: 0.5rem 0;
+      }
     </style>
   </head>
   <body class="bg-gray-50 min-h-screen">
@@ -117,11 +235,12 @@
             <div
               class="w-10 h-10 bg-white rounded-full flex items-center justify-center"
             >
-              <i class="fas fa-robot text-blue-600 text-xl"></i>
+              <img src="/images/hyundai-logo.png" alt="Hyundai" class="w-8 h-8" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+              <i class="fas fa-car text-blue-600 text-xl" style="display:none;"></i>
             </div>
             <div>
-              <h1 class="text-2xl font-bold">AI Assistant</h1>
-              <p class="text-blue-100 text-sm">Interactive Bubble Chat</p>
+              <h1 class="text-2xl font-bold">Hyundai Mobis Assistant</h1>
+              <p class="text-blue-100 text-sm">Genuine Accessories & Parts Enquiry System</p>
             </div>
           </div>
           <div class="flex items-center space-x-4">
@@ -147,7 +266,7 @@
         <div class="bg-white rounded-2xl shadow-xl overflow-hidden">
           <!-- Chat Header -->
           <div
-            class="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6"
+            class="bg-gradient-to-r from-blue-900 to-blue-700 text-white p-6"
           >
             <div class="flex items-center space-x-3">
               <div
@@ -156,10 +275,9 @@
                 <i class="fas fa-comments text-xl"></i>
               </div>
               <div>
-                <h2 class="text-xl font-bold">Conversational AI</h2>
+                <h2 class="text-xl font-bold">Hyundai Mobis AI Assistant</h2>
                 <p class="text-blue-100">
-                  Ask me anything about Hyundai Mobis genuine accessories,
-                  dealers, or offers!
+                  Browse accessories & parts, find dealers, submit enquiries, and check offers!
                 </p>
               </div>
             </div>
@@ -194,7 +312,7 @@
               <input
                 type="text"
                 id="messageInput"
-                placeholder="Type your message or start with 'hello'..."
+                placeholder="Type your message, a number to select an item, or start with 'hello'..."
                 class="flex-1 border-2 border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
                 maxlength="500"
               />
@@ -219,19 +337,32 @@
         </div>
 
         <!-- Info Panel -->
-        <div class="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="mt-8 grid grid-cols-1 md:grid-cols-4 gap-6">
           <div class="bg-white rounded-xl shadow-lg p-6">
             <div class="flex items-center space-x-3 mb-4">
               <div
                 class="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center"
               >
-                <i class="fas fa-car text-green-600"></i>
+                <i class="fas fa-car-side text-green-600"></i>
               </div>
-              <h3 class="text-lg font-semibold">Car Information</h3>
+              <h3 class="text-lg font-semibold">Accessories</h3>
             </div>
             <p class="text-gray-600 text-sm">
-              Get detailed information about car makes, models, and vehicle
-              types from the NHTSA database.
+              Browse genuine Hyundai accessories by category. Select by number to enquire.
+            </p>
+          </div>
+
+          <div class="bg-white rounded-xl shadow-lg p-6">
+            <div class="flex items-center space-x-3 mb-4">
+              <div
+                class="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center"
+              >
+                <i class="fas fa-tools text-orange-600"></i>
+              </div>
+              <h3 class="text-lg font-semibold">Parts</h3>
+            </div>
+            <p class="text-gray-600 text-sm">
+              Search for genuine Hyundai parts by part number or category.
             </p>
           </div>
 
@@ -240,12 +371,12 @@
               <div
                 class="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center"
               >
-                <i class="fas fa-cat text-purple-600"></i>
+                <i class="fas fa-store text-purple-600"></i>
               </div>
-              <h3 class="text-lg font-semibold">Fun Facts</h3>
+              <h3 class="text-lg font-semibold">Find Dealers</h3>
             </div>
             <p class="text-gray-600 text-sm">
-              Discover interesting cat facts from our random fact generator API.
+              Locate authorized dealers and distributors near you.
             </p>
           </div>
 
@@ -254,13 +385,12 @@
               <div
                 class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center"
               >
-                <i class="fas fa-comments text-blue-600"></i>
+                <i class="fas fa-file-alt text-blue-600"></i>
               </div>
-              <h3 class="text-lg font-semibold">Interactive Chat</h3>
+              <h3 class="text-lg font-semibold">Enquiries</h3>
             </div>
             <p class="text-gray-600 text-sm">
-              Enjoy a guided conversation with clickable options and natural
-              flow.
+              Submit enquiries and get a reference number for tracking.
             </p>
           </div>
         </div>
@@ -272,10 +402,10 @@
       <div class="container mx-auto px-6">
         <p class="text-gray-300">
           <i class="fas fa-code mr-2"></i>
-          Built with Spring Boot, Spring AI, and modern web technologies
+          Hyundai Mobis Genuine Accessories & Parts Portal
         </p>
         <p class="text-gray-400 text-sm mt-2">
-          Powered by Groq API and NHTSA Vehicle Database
+          Powered by Spring Boot, Spring AI, and Hyundai Mobis APIs
         </p>
       </div>
     </footer>

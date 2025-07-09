@@ -14,6 +14,9 @@ import java.util.stream.Collectors;
 import com.hyundai.mobis.dto.StateInfo;
 import org.springframework.stereotype.Component;
 
+import com.hyundai.mobis.service.MobisApiService.PartTypesResponse;
+import com.hyundai.mobis.service.MobisApiService.PartsResponse;
+
 import java.util.Arrays;
 import java.util.List;
 
@@ -40,6 +43,14 @@ public class MobisApiFunctions {
 
     public WarrantyCheckResponse checkWarrantyFunction(WarrantyCheckRequest request) {
         return mobisApiService.checkWarranty(request);
+    }
+
+    public PartTypesResponse getAllPartTypesFunction() {
+        return mobisApiService.getAllPartTypes();
+    }
+    
+    public PartsResponse getPartsByTypeFunction(PartTypeRequest request) {
+        return mobisApiService.getPartsByType(request.typeId());
     }
 
     public OffersResponse getOffersFunction(OffersRequest request) {
@@ -123,4 +134,6 @@ public class MobisApiFunctions {
         String warrantyStatus,
         String warrantyExpiry
     ) {}
+
+    public record PartTypeRequest(Long typeId) {}
 } 
