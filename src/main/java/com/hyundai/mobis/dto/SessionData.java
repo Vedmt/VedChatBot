@@ -3,13 +3,19 @@ package com.hyundai.mobis.dto;
 import lombok.Data;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.List;
+import java.util.ArrayList;
 
 @Data
 public class SessionData {
     private String sessionId;
     private String currentState; // Current conversation state
     private Map<String, Object> context = new HashMap<>();
-    
+    private boolean showingAccessories;
+    private int accessoriesCount;
+    private List<AccessoryInfo> accessoriesList;
+    private Map<String, AccessoryTypeInfo> typeInfoMap;
+    private Map<String, AccessorySubTypeInfo> subTypeInfoMap;
     // Flow tracking
     private boolean isAccessoryFlow;
     private String flowStage; // "MODEL", "TYPE", "SUBTYPE", "PRODUCT", etc.
@@ -66,6 +72,69 @@ public class SessionData {
         pageTracking.put(stage, page);
     }
     
+    // Add these methods to SessionData.java
+    public boolean isShowingAccessories() {
+        return showingAccessories;
+    }
+
+    public void setShowingAccessories(boolean showingAccessories) {
+        this.showingAccessories = showingAccessories;
+    }
+
+    public int getAccessoriesCount() {
+        return accessoriesCount;
+    }
+
+    public void setAccessoriesCount(int count) {
+        this.accessoriesCount = count;
+    }
+
+    public AccessoryInfo getAccessoryByIndex(int index) {
+        if (accessoriesList != null && index >= 0 && index < accessoriesList.size()) {
+            return accessoriesList.get(index);
+        }
+        return null;
+    }
+
+    public void clearAccessoriesList() {
+        if (accessoriesList != null) {
+            accessoriesList.clear();
+        }
+    }
+
+    public void addAccessoryToList(AccessoryInfo accessory) {
+        if (accessoriesList == null) {
+            accessoriesList = new ArrayList<>();
+        }
+        accessoriesList.add(accessory);
+    }
+
+    public void setIsAccessoryFlow(boolean isAccessoryFlow) {
+        this.isAccessoryFlow = isAccessoryFlow;
+    }
+
+public void addTypeInfo(String typeName, AccessoryTypeInfo typeInfo) {
+    if (typeInfoMap == null) {
+        typeInfoMap = new HashMap<>();
+    }
+    typeInfoMap.put(typeName, typeInfo);
+}
+
+public AccessoryTypeInfo getTypeInfo(String typeName) {
+    return typeInfoMap != null ? typeInfoMap.get(typeName) : null;
+}
+
+public void addSubTypeInfo(String subTypeName, AccessorySubTypeInfo subTypeInfo) {
+    if (subTypeInfoMap == null) {
+        subTypeInfoMap = new HashMap<>();
+    }
+    subTypeInfoMap.put(subTypeName, subTypeInfo);
+}
+
+public AccessorySubTypeInfo getSubTypeInfo(String subTypeName) {
+    return subTypeInfoMap != null ? subTypeInfoMap.get(subTypeName) : null;
+}
+
     public int getPageForStage(String stage) {
         return pageTracking.getOrDefault(stage, 0);
     }

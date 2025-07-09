@@ -16,6 +16,32 @@ public interface EnquiryRepository extends JpaRepository<EnquiryEntity, Long> {
     List<EnquiryEntity> findBySessionId(String sessionId);
     
     List<EnquiryEntity> findByCustomerEmailOrMobileNo(String email, String mobileNo);
+
+    boolean existsByEmailAndMobileAndItemIdAndItemTypeAndCreatedAtAfter(
+    String email, 
+    String mobile, 
+    String itemId, 
+    String itemType, 
+    LocalDateTime createdAt
+    );
+
+    // Check for duplicate accessory enquiry
+    boolean existsByEmailAndMobileNoAndAccessoryIdAndItemTypeAndCreatedAtAfter(
+        String email, 
+        String mobileNo, 
+        String accessoryId, 
+        String itemType, 
+        LocalDateTime createdAt
+    );
+    
+    // Check for duplicate part enquiry
+    boolean existsByEmailAndMobileNoAndPartIdAndItemTypeAndCreatedAtAfter(
+        String email, 
+        String mobileNo, 
+        String partId, 
+        String itemType, 
+        LocalDateTime createdAt
+    );
     
     @Query("SELECT e FROM EnquiryEntity e WHERE e.createdAt >= :startDate AND e.createdAt <= :endDate")
     List<EnquiryEntity> findEnquiriesInDateRange(LocalDateTime startDate, LocalDateTime endDate);

@@ -1,7 +1,21 @@
 package com.hyundai.mobis.service;
 
 import com.hyundai.mobis.config.HyundaiMobisConfig;
-import com.hyundai.mobis.dto.*;
+
+import com.hyundai.mobis.dto.DealerSearchRequest;
+import com.hyundai.mobis.dto.DealerSearchResponse;
+import com.hyundai.mobis.dto.PartSearchRequest;
+import com.hyundai.mobis.dto.PartSearchResponse;
+import com.hyundai.mobis.dto.StateInfo;
+import com.hyundai.mobis.dto.CityInfo;
+import com.hyundai.mobis.dto.DealerInfo;
+import org.springframework.http.HttpMethod;
+import com.hyundai.mobis.dto.MobisAccessoriesRequest;
+import com.hyundai.mobis.dto.MobisAccessoriesResponse;
+import com.hyundai.mobis.dto.AccessoryTypesResponse;
+import com.hyundai.mobis.dto.AccessorySubTypesResponse;
+import com.hyundai.mobis.dto.StatesResponse;
+import com.hyundai.mobis.dto.DistributorInfo;
 import org.springframework.core.ParameterizedTypeReference;
 import com.hyundai.mobis.functions.MobisApiFunctions.OffersRequest;
 import com.hyundai.mobis.functions.MobisApiFunctions.OffersResponse;
@@ -135,7 +149,7 @@ public class MobisApiService {
             );
             return response.getBody();
         } catch (Exception e) {
-            log.error("Error fetching distributors for state: " + stateId, e);
+            logger.error("Error fetching distributors for state: " + stateId, e);
             return new ArrayList<>();
         }
     }
@@ -381,7 +395,6 @@ public class MobisApiService {
             throw new RuntimeException("Failed to get states", e);
         }
     }
-
 
     // All mock data creation methods remain the same
     private PartSearchResponse createMockPartSearchResponse(PartSearchRequest request) {
