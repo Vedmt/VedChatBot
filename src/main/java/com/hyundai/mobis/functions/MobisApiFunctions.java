@@ -10,6 +10,8 @@ import com.hyundai.mobis.dto.AccessoryTypesResponse;
 import com.hyundai.mobis.dto.AccessorySubTypesResponse;
 import com.hyundai.mobis.dto.StatesResponse;
 import com.hyundai.mobis.service.MobisApiService;
+import java.util.stream.Collectors;
+import com.hyundai.mobis.dto.StateInfo;
 import org.springframework.stereotype.Component;
 
 import java.util.Arrays;
@@ -65,7 +67,14 @@ public class MobisApiFunctions {
     }
 
     public StatesResponse getDistributorStatesFunction() {
-        return mobisApiService.getDistributorStates();
+        List<StateInfo> states = mobisApiService.getDistributorStates();
+        
+        // Use getDescription() since that's likely the state name
+        List<String> stateNames = states.stream()
+            .map(StateInfo::getDescription)
+            .collect(Collectors.toList());
+        
+        return new StatesResponse(stateNames, true, "Success");
     }
 
     // Request/Response classes

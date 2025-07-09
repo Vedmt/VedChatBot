@@ -10,6 +10,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import java.util.List;
 import java.util.function.Function;
+import com.hyundai.mobis.dto.StateInfo;
 import java.util.function.Supplier;
 
 @Configuration
@@ -36,7 +37,7 @@ public class SpringAIConfig {
     }
 
     @Bean
-    public Supplier<StatesResponse> getDistributorStatesFunction(MobisApiService mobisApiService) {
+    public Supplier<List<StateInfo>> getDistributorStatesFunction(MobisApiService mobisApiService) {
         return mobisApiService::getDistributorStates;
     }
 } 

@@ -1,7 +1,10 @@
 package com.hyundai.mobis.service;
 
+
 import com.hyundai.mobis.dto.EnquiryForm;
 import com.hyundai.mobis.model.EnquiryEntity;
+import lombok.Builder;
+import lombok.Data;
 import com.hyundai.mobis.repository.EnquiryRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -65,6 +68,22 @@ public class EnquirySubmissionService {
         String dateStr = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
         String randomStr = generateRandomString(5);
         return String.format("ENQ-%s-%s", dateStr, randomStr);
+    }
+
+    public boolean checkDuplicateEnquiry(String email, String mobile, String itemId, String itemType) {
+        LocalDateTime twentyFourHoursAgo = LocalDateTime.now().minusHours(24);
+        
+        if ("accessory".equals(itemType)) {
+            return enquiryRepository.existsByEmailAndMobileNoAndAccessoryIdAndItemTypeAndCreatedAtAfter(
+                email, mobile, itemId, itemType, twentyFourHoursAgo
+            );
+        } else if ("part".equals(itemType)) {
+            return enquiryRepository.existsByEmailAndMobileNoAndPartIdAndItemTypeAndCreatedAtAfter(
+                email, mobile, itemId, itemType, twentyFourHoursAgo
+            );
+        }
+        
+        return false;
     }
     
     private String generateRandomString(int length) {

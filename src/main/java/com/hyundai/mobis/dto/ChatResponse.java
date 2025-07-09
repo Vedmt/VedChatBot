@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
 import java.util.List;
+import java.time.LocalDateTime;
 
 @Data
 @Builder
@@ -13,9 +14,17 @@ import java.util.List;
 public class ChatResponse {
     private String message;
     private String sessionId;
-    private String timestamp;
     private String responseType; // "text", "buttons", "form", "confirmation"
+
+    private boolean success;
+    private String question;
+    private List<String> options;
+    private boolean conversationEnd;
+    private String conversationType;
+    private String errorMessage;
     
+    private LocalDateTime timestamp;
+
     // Button support
     private List<ButtonResponse.Button> buttons;
     private List<ButtonResponse.Button> navigationButtons;
@@ -35,6 +44,46 @@ public class ChatResponse {
         return ChatResponse.builder()
             .message(message)
             .responseType("text")
+            .build();
+    }
+
+
+    public void setTimestamp(LocalDateTime timestamp) {
+        this.timestamp = timestamp;
+    }
+
+    public void setSuccess(boolean success) {
+        this.success = success;
+    }
+    
+    public void setQuestion(String question) {
+        this.question = question;
+    }
+    
+    public void setOptions(List<String> options) {
+        this.options = options;
+    }
+    
+    public void setConversationEnd(boolean conversationEnd) {
+        this.conversationEnd = conversationEnd;
+    }
+    
+    public void setConversationType(String conversationType) {
+        this.conversationType = conversationType;
+    }
+    
+    public void setErrorMessage(String errorMessage) {
+        this.errorMessage = errorMessage;
+    }
+
+    public static ChatResponse error(String errorMessage, String sessionId) {
+        return ChatResponse.builder()
+            .sessionId(sessionId)
+            .success(false)
+            .message(errorMessage)
+            .errorMessage(errorMessage)
+            .timestamp(LocalDateTime.now())
+            .responseType("error")
             .build();
     }
     
