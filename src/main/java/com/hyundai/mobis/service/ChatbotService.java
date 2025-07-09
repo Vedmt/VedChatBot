@@ -1,15 +1,7 @@
 package com.hyundai.mobis.service;
 
-import com.hyundai.mobis.config.HyundaiMobisConfig; // Change this if you named it Configuration.java
-import com.hyundai.mobis.dto.ChatRequest;
-import com.hyundai.mobis.dto.ChatResponse;
-import com.hyundai.mobis.dto.MobisAccessoriesRequest;
-import com.hyundai.mobis.dto.MobisAccessoriesResponse;
-import com.hyundai.mobis.dto.AccessoryTypesResponse;
-import com.hyundai.mobis.dto.AccessorySubTypesResponse;
-import com.hyundai.mobis.dto.StatesResponse;
-import com.hyundai.mobis.dto.DealerSearchRequest;
-import com.hyundai.mobis.dto.DealerSearchResponse;
+import com.hyundai.mobis.config.HyundaiMobisConfig;
+import com.hyundai.mobis.dto.*;
 import com.hyundai.mobis.functions.MobisApiFunctions.OffersRequest;
 import com.hyundai.mobis.functions.MobisApiFunctions.OffersResponse;
 import com.hyundai.mobis.model.ChatMessage;
@@ -29,20 +21,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.LocalDateTime;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.ArrayList;
 import java.util.stream.Collectors;
-
-import static java.util.stream.Collectors.groupingBy;
 
 @Service
 public class ChatbotService {
 
     private static final Logger logger = LoggerFactory.getLogger(ChatbotService.class);
+
+    @Autowired
+    private EnquiryFlowHandler enquiryFlowHandler;
 
     @Autowired
     private ChatClient chatClient;
@@ -54,9 +43,15 @@ public class ChatbotService {
     private MobisApiService mobisApiService;
 
     @Autowired
-    private HyundaiMobisConfig config; // Change this if you named it Configuration
+    private HyundaiMobisConfig config;
 
-    private static final ConcurrentHashMap<String, String> sessionState = new ConcurrentHashMap<>();
+    // Changed from String to SessionData
+    private static final ConcurrentHashMap<String, SessionData> sessions = new ConcurrentHashMap<>();
+
+    // Get or create session
+    private SessionData getOrCreateSession(String sessionId) {
+        return sessions.computeIfAbsent(sessionId, k -> new SessionData(sessionId));
+    }
 
     // Dynamic system prompt that uses config
     private String getSystemPrompt() {
@@ -92,33 +87,63 @@ public class ChatbotService {
         try {
             logger.info("USER [{}]: {}", request.getSessionId(), request.getMessage());
             String userMessage = request.getMessage().toLowerCase().trim();
+            
+            SessionData session = getOrCreateSession(request.getSessionId());
+            
+            // Check if in enquiry flow
+            if (session.isInEnquiryFlow()) {
+                return enquiryFlowHandler.handleEnquiryFlow(session, request.getMessage());
+            }
+            
+            // Check if user selected an accessory by number for enquiry
+            if (session.isShowingAccessories() && userMessage.matches("^\\d+$")) {
+                int selection = Integer.parseInt(userMessage);
+                if (selection > 0 && selection <= session.getAccessoriesCount()) {
+                    SessionData.AccessoryInfo selectedAccessory = session.getAccessoryByIndex(selection - 1);
+                    if (selectedAccessory != null) {
+                        session.setSelectedAccessory(selectedAccessory);
+                        session.setShowingAccessories(false);
+                        return enquiryFlowHandler.handleEnquiryFlow(session, "enquire");
+                    }
+                }
+            }
+            
+            // Check for enquiry keywords
+            if (shouldHandleAsEnquiry(session, request.getMessage())) {
+                if (session.getSelectedAccessory() != null) {
+                    return enquiryFlowHandler.handleEnquiryFlow(session, "enquire");
+                } else {
+                    return createErrorResponse(request.getSessionId(), 
+                        "Please select an accessory first before making an enquiry.");
+                }
+            }
 
             // Log session state
-            String lastState = sessionState.get(request.getSessionId());
+            String lastState = session.getCurrentState();
             logger.info("Session [{}] last state: {}", request.getSessionId(), lastState);
 
             // Check for stateful follow-up
             if (lastState != null) {
                 if (lastState.equals("awaiting_vehicle_selection")) {
-                    sessionState.remove(request.getSessionId());
-                    return createTypeSelectionResponse(request.getSessionId(), request.getMessage());
+                    session.setCurrentState(null);
+                    return createTypeSelectionResponse(session, request.getMessage());
                 } else if (lastState.equals("awaiting_type_selection")) {
-                    sessionState.remove(request.getSessionId());
-                    return handleTypeSelection(request.getSessionId(), request.getMessage());
+                    session.setCurrentState(null);
+                    return handleTypeSelection(session, request.getMessage());
                 } else if (lastState.equals("awaiting_subtype_selection")) {
-                    sessionState.remove(request.getSessionId());
-                    return handleSubTypeSelection(request.getSessionId(), request.getMessage());
+                    session.setCurrentState(null);
+                    return handleSubTypeSelection(session, request.getMessage());
                 } else if (lastState.equals("awaiting_location_selection")) {
-                    sessionState.remove(request.getSessionId());
-                    return createDealersForLocationResponse(request.getSessionId(), request.getMessage());
+                    session.setCurrentState(null);
+                    return createDealersForLocationResponse(session, request.getMessage());
                 }
             }
 
             // Handle conversational flow
             if (isConversationStart(userMessage)) {
-                return createConversationStartResponse(request.getSessionId());
+                return createConversationStartResponse(session);
             } else if (isOptionSelection(userMessage)) {
-                return handleOptionSelection(request);
+                return handleOptionSelection(request, session);
             } else {
                 // Handle direct questions using existing logic
                 return handleDirectQuestion(request);
@@ -127,6 +152,16 @@ public class ChatbotService {
             logger.error("Error processing chat message for session {}: {}", request.getSessionId(), e.getMessage(), e);
             throw new RuntimeException("Failed to process chat message: " + e.getMessage(), e);
         }
+    }
+
+    private boolean shouldHandleAsEnquiry(SessionData session, String message) {
+        String lowerMessage = message.toLowerCase();
+        return lowerMessage.contains("enquire") || 
+               lowerMessage.contains("enquiry") || 
+               lowerMessage.contains("inquiry") ||
+               lowerMessage.contains("buy") ||
+               lowerMessage.contains("purchase") ||
+               lowerMessage.contains("contact dealer");
     }
 
     private boolean isConversationStart(String message) {
@@ -142,9 +177,9 @@ public class ChatbotService {
                 message.contains("product support");
     }
 
-    private ChatResponse createConversationStartResponse(String sessionId) {
+    private ChatResponse createConversationStartResponse(SessionData session) {
         ChatResponse response = new ChatResponse();
-        response.setSessionId(sessionId);
+        response.setSessionId(session.getSessionId());
         response.setSuccess(true);
         response.setTimestamp(LocalDateTime.now());
         response.setMessage("Hello! I'm your Hyundai Mobis Genuine Accessories assistant. I can help you explore genuine accessories for your Hyundai vehicle and find the best prices.");
@@ -158,52 +193,59 @@ public class ChatbotService {
         response.setConversationEnd(false);
         response.setConversationType("main_menu");
 
-        saveChatMessage(sessionId, "Conversation start", response.getMessage(), null, null);
+        saveChatMessage(session.getSessionId(), "Conversation start", response.getMessage(), null, null);
         return response;
     }
 
-    private ChatResponse handleOptionSelection(ChatRequest request) {
+    private ChatResponse handleOptionSelection(ChatRequest request, SessionData session) {
         String userMessage = request.getMessage().trim();
-        String sessionId = request.getSessionId();
+        String sessionId = session.getSessionId();
 
         logger.info("Handling option selection: [{}]", userMessage);
 
+        // Check for navigation options first
+        if (isNavigationOption(userMessage)) {
+            return handleNavigationOption(session, userMessage);
+        }
+
         // Handle main menu options
         if (userMessage.equalsIgnoreCase("Browse Accessories")) {
-            sessionState.put(sessionId, "awaiting_vehicle_selection");
-            return createVehicleSelectionResponse(sessionId);
+            session.setCurrentState("awaiting_vehicle_selection");
+            return createVehicleSelectionResponse(session);
         } else if (userMessage.equalsIgnoreCase("Find Dealers & Distributors")) {
-            sessionState.put(sessionId, "awaiting_location_selection");
-            return createLocationSelectionResponse(sessionId);
+            session.setCurrentState("awaiting_location_selection");
+            return createLocationSelectionResponse(session);
         } else if (userMessage.equalsIgnoreCase("Check Current Offers")) {
-            return createOffersResponse(sessionId);
+            return createOffersResponse(session);
         } else if (userMessage.equalsIgnoreCase("Get Product Support")) {
-            return createProductSupportResponse(sessionId);
+            return createProductSupportResponse(session);
+        } else if (userMessage.equalsIgnoreCase("Find Distributors")) {
+            return createDistributorsResponse(session);
         }
 
         // Handle numeric selection
         if (userMessage.matches("^\\d+$")) {
             int selection = Integer.parseInt(userMessage);
-            return handleNumericSelection(selection, sessionId);
+            return handleNumericSelection(selection, session);
         }
 
-        return createInvalidSelectionResponse(sessionId);
+        return createInvalidSelectionResponse(session);
     }
 
-    private ChatResponse handleNumericSelection(int selection, String sessionId) {
+    private ChatResponse handleNumericSelection(int selection, SessionData session) {
         switch (selection) {
             case 1:
-                sessionState.put(sessionId, "awaiting_vehicle_selection");
-                return createVehicleSelectionResponse(sessionId);
+                session.setCurrentState("awaiting_vehicle_selection");
+                return createVehicleSelectionResponse(session);
             case 2:
-                sessionState.put(sessionId, "awaiting_location_selection");
-                return createLocationSelectionResponse(sessionId);
+                session.setCurrentState("awaiting_location_selection");
+                return createLocationSelectionResponse(session);
             case 3:
-                return createOffersResponse(sessionId);
+                return createOffersResponse(session);
             case 4:
-                return createProductSupportResponse(sessionId);
+                return createProductSupportResponse(session);
             default:
-                return createInvalidSelectionResponse(sessionId);
+                return createInvalidSelectionResponse(session);
         }
     }
 
@@ -212,9 +254,9 @@ public class ChatbotService {
         return str.substring(0, 1).toUpperCase() + str.substring(1);
     }
 
-    private ChatResponse createVehicleSelectionResponse(String sessionId) {
+    private ChatResponse createVehicleSelectionResponse(SessionData session) {
         ChatResponse response = new ChatResponse();
-        response.setSessionId(sessionId);
+        response.setSessionId(session.getSessionId());
         response.setSuccess(true);
         response.setTimestamp(LocalDateTime.now());
         response.setMessage("Great! Let's find the perfect accessories for your Hyundai. Which vehicle model do you own?");
@@ -226,21 +268,27 @@ public class ChatbotService {
         response.setConversationEnd(false);
         response.setConversationType("vehicle_selection");
 
-        saveChatMessage(sessionId, "Vehicle selection prompt", response.getMessage(), null, null);
+        saveChatMessage(session.getSessionId(), "Vehicle selection prompt", response.getMessage(), null, null);
         return response;
     }
 
-    // New method to handle type selection after vehicle
-    private ChatResponse createTypeSelectionResponse(String sessionId, String vehicleModel) {
+    private ChatResponse createTypeSelectionResponse(SessionData session, String vehicleModel) {
         try {
             // Store selected model in session
-            sessionState.put(sessionId + "_model", vehicleModel);
+            SessionData.ModelInfo modelInfo = new SessionData.ModelInfo();
+            modelInfo.setName(vehicleModel);
+                        HyundaiMobisConfig.Model configModel = config.getModelByName(vehicleModel);
+            if (configModel != null) {
+                modelInfo.setId(Long.parseLong(configModel.getModelId()));
+            }
+            session.setSelectedModel(modelInfo);
+            session.setIsAccessoryFlow(true);
 
             logger.info("API CALL: getAccessoryTypesForModelFunction (model: {})", vehicleModel);
             AccessoryTypesForModelResponse typesResponse = mobisApiService.getAccessoryTypesForModel(vehicleModel);
 
             if (!typesResponse.success() || typesResponse.types().isEmpty()) {
-                return createErrorResponse(sessionId, "No accessories found for " + vehicleModel);
+                return createErrorResponse(session.getSessionId(), "No accessories found for " + vehicleModel);
             }
 
             StringBuilder message = new StringBuilder();
@@ -253,14 +301,17 @@ public class ChatbotService {
                 message.append(String.format("%s **%s**\n", icon, type.typeName()));
                 options.add(type.typeName());
 
-                // Store typeId mapping in session
-                sessionState.put(sessionId + "_type_" + type.typeName(),String.valueOf(type.typeId()));
+                // Store type info in session
+                SessionData.AccessoryTypeInfo typeInfo = new SessionData.AccessoryTypeInfo();
+                typeInfo.setId(type.typeId());
+                typeInfo.setName(type.typeName());
+                session.addTypeInfo(type.typeName(), typeInfo);
             }
 
-            sessionState.put(sessionId, "awaiting_type_selection");
+            session.setCurrentState("awaiting_type_selection");
 
             ChatResponse response = new ChatResponse();
-            response.setSessionId(sessionId);
+            response.setSessionId(session.getSessionId());
             response.setSuccess(true);
             response.setTimestamp(LocalDateTime.now());
             response.setMessage(message.toString());
@@ -269,34 +320,31 @@ public class ChatbotService {
             response.setConversationEnd(false);
             response.setConversationType("type_selection");
 
-            saveChatMessage(sessionId, "Type selection for " + vehicleModel, message.toString(), "getAccessoryTypesForModelFunction", null);
+            saveChatMessage(session.getSessionId(), "Type selection for " + vehicleModel, message.toString(), "getAccessoryTypesForModelFunction", null);
             return response;
         } catch (Exception e) {
             logger.error("Error getting types: {}", e.getMessage());
-            return createErrorResponse(sessionId, "Error loading accessory categories");
+            return createErrorResponse(session.getSessionId(), "Error loading accessory categories");
         }
     }
 
-    // Handle type selection and show subtypes
-    private ChatResponse handleTypeSelection(String sessionId, String selectedType) {
+    private ChatResponse handleTypeSelection(SessionData session, String selectedType) {
         try {
-            String modelName = sessionState.get(sessionId + "_model");
-            String typeIdStr = sessionState.get(sessionId + "_type_" + selectedType);
+            SessionData.ModelInfo model = session.getSelectedModel();
+            SessionData.AccessoryTypeInfo typeInfo = session.getTypeInfo(selectedType);
 
-            if (modelName == null || typeIdStr == null) {
-                return createErrorResponse(sessionId, "Session expired. Please start over.");
+            if (model == null || typeInfo == null) {
+                return createErrorResponse(session.getSessionId(), "Session expired. Please start over.");
             }
 
-            Long typeId = Long.parseLong(typeIdStr);
-            sessionState.put(sessionId + "_selected_type", selectedType);
-            sessionState.put(sessionId + "_selected_typeId", typeIdStr);
+            session.setSelectedType(typeInfo);
 
-            logger.info("API CALL: getAccessorySubTypesForTypeFunction (model: {}, typeId: {})", modelName, typeId);
-            AccessorySubTypesForTypeResponse subTypesResponse = mobisApiService.getAccessorySubTypesForType(modelName, typeId);
+            logger.info("API CALL: getAccessorySubTypesForTypeFunction (model: {}, typeId: {})", model.getName(), typeInfo.getId());
+            AccessorySubTypesForTypeResponse subTypesResponse = mobisApiService.getAccessorySubTypesForType(model.getName(), typeInfo.getId());
 
             if (!subTypesResponse.success() || subTypesResponse.subTypes().isEmpty()) {
                 // If no subtypes, show all accessories for this type
-                return showAccessoriesForType(sessionId, modelName, typeId, selectedType);
+                return showAccessoriesForType(session, model.getName(), typeInfo.getId(), selectedType);
             }
 
             StringBuilder message = new StringBuilder();
@@ -308,14 +356,17 @@ public class ChatbotService {
                 message.append(String.format("• **%s**\n", subType.subTypeName()));
                 options.add(subType.subTypeName());
 
-                // Store subTypeId mapping in session
-                sessionState.put(sessionId + "_subtype_" + subType.subTypeName(), String.valueOf(subType.subTypeId()));
+                // Store subtype info in session
+                SessionData.AccessorySubTypeInfo subTypeInfo = new SessionData.AccessorySubTypeInfo();
+                subTypeInfo.setId(subType.subTypeId());
+                subTypeInfo.setName(subType.subTypeName());
+                session.addSubTypeInfo(subType.subTypeName(), subTypeInfo);
             }
 
-            sessionState.put(sessionId, "awaiting_subtype_selection");
+            session.setCurrentState("awaiting_subtype_selection");
 
             ChatResponse response = new ChatResponse();
-            response.setSessionId(sessionId);
+            response.setSessionId(session.getSessionId());
             response.setSuccess(true);
             response.setTimestamp(LocalDateTime.now());
             response.setMessage(message.toString());
@@ -324,74 +375,88 @@ public class ChatbotService {
             response.setConversationEnd(false);
             response.setConversationType("subtype_selection");
 
-            saveChatMessage(sessionId, "Subtype selection for " + selectedType, message.toString(), "getAccessorySubTypesForTypeFunction", null);
+            saveChatMessage(session.getSessionId(), "Subtype selection for " + selectedType, message.toString(), "getAccessorySubTypesForTypeFunction", null);
             return response;
         } catch (Exception e) {
             logger.error("Error handling type selection: {}", e.getMessage());
-            return createErrorResponse(sessionId, "Error loading subcategories");
+            return createErrorResponse(session.getSessionId(), "Error loading subcategories");
         }
     }
 
-    // Handle subtype selection and show accessories
-    private ChatResponse handleSubTypeSelection(String sessionId, String selectedSubType) {
+    private ChatResponse handleSubTypeSelection(SessionData session, String selectedSubType) {
         try {
-            String modelName = sessionState.get(sessionId + "_model");
-            String typeIdStr = sessionState.get(sessionId + "_selected_typeId");
-            String subTypeIdStr = sessionState.get(sessionId + "_subtype_" + selectedSubType);
+            SessionData.ModelInfo model = session.getSelectedModel();
+            SessionData.AccessoryTypeInfo typeInfo = session.getSelectedType();
+            SessionData.AccessorySubTypeInfo subTypeInfo = session.getSubTypeInfo(selectedSubType);
 
-            if (modelName == null || typeIdStr == null || subTypeIdStr == null) {
-                return createErrorResponse(sessionId, "Session expired. Please start over.");
+            if (model == null || typeInfo == null || subTypeInfo == null) {
+                return createErrorResponse(session.getSessionId(), "Session expired. Please start over.");
             }
 
-            Long typeId = Long.parseLong(typeIdStr);
-            Long subTypeId = Long.parseLong(subTypeIdStr);
+            session.setSelectedSubType(subTypeInfo);
 
             logger.info("API CALL: getAccessoriesFilteredFunction (model: {}, typeId: {}, subTypeId: {})",
-                    modelName, typeId, subTypeId);
-            MobisAccessoriesResponse accessories = mobisApiService.getAccessoriesFiltered(modelName, typeId, subTypeId);
+                    model.getName(), typeInfo.getId(), subTypeInfo.getId());
+            MobisAccessoriesResponse accessories = mobisApiService.getAccessoriesFiltered(model.getName(), typeInfo.getId(), subTypeInfo.getId());
 
-            return displayAccessories(sessionId, modelName, accessories, selectedSubType);
+            return displayAccessories(session, model.getName(), accessories, selectedSubType);
         } catch (Exception e) {
             logger.error("Error handling subtype selection: {}", e.getMessage());
-            return createErrorResponse(sessionId, "Error loading accessories");
+            return createErrorResponse(session.getSessionId(), "Error loading accessories");
         }
     }
 
-    // Show accessories for a type (when no subtypes)
-    private ChatResponse showAccessoriesForType(String sessionId, String modelName, Long typeId, String typeName) {
+    private ChatResponse showAccessoriesForType(SessionData session, String modelName, Long typeId, String typeName) {
         try {
             logger.info("API CALL: getAccessoriesFilteredFunction (model: {}, typeId: {}, no subType)", modelName, typeId);
             MobisAccessoriesResponse accessories = mobisApiService.getAccessoriesFiltered(modelName, typeId, null);
 
-            return displayAccessories(sessionId, modelName, accessories, typeName);
+            return displayAccessories(session, modelName, accessories, typeName);
         } catch (Exception e) {
             logger.error("Error showing accessories: {}", e.getMessage());
-            return createErrorResponse(sessionId, "Error loading accessories");
+            return createErrorResponse(session.getSessionId(), "Error loading accessories");
         }
     }
 
-    // Common method to display accessories
-    private ChatResponse displayAccessories(String sessionId, String modelName, MobisAccessoriesResponse accessories, String categoryName) {
+    private ChatResponse displayAccessories(SessionData session, String modelName, MobisAccessoriesResponse accessories, String categoryName) {
         StringBuilder message = new StringBuilder();
         message.append(String.format("🛍️ **%s Accessories for %s**\n\n", categoryName, modelName));
 
         if (accessories.accessories().isEmpty()) {
             message.append("No accessories found in this category.");
+            session.setShowingAccessories(false);
+            session.clearAccessoriesList();
         } else {
             message.append(String.format("Found %d accessories:\n\n", accessories.accessories().size()));
 
+            int index = 1;
+            session.clearAccessoriesList(); // Clear previous accessories
+            
             for (MobisAccessoriesResponse.Accessory accessory : accessories.accessories()) {
                 String icon = getCategoryIcon(accessory.type());
-                message.append(String.format("%s **%s**\n", icon, accessory.accessoryName()));
+                message.append(String.format("%d. %s **%s**\n", index++, icon, accessory.accessoryName()));
                 message.append(String.format("   💰 **MRP: ₹%.0f**\n", accessory.mrp()));
                 message.append(String.format("   📝 %s\n", cleanHtml(accessory.body())));
                 message.append(String.format("   🔧 Part Code: %s\n", accessory.accessoryCode()));
                 message.append(String.format("   🏷️ Category: %s - %s\n\n", accessory.type(), accessory.subType()));
+                
+                // Store accessory info in session
+                SessionData.AccessoryInfo info = new SessionData.AccessoryInfo();
+                info.setId(accessory.id());
+                info.setName(accessory.accessoryName());
+                info.setDescription(cleanHtml(accessory.body()));
+                info.setPrice(String.valueOf(accessory.mrp()));
+                session.addAccessoryToList(info);
             }
+            
+            session.setShowingAccessories(true);
+            session.setAccessoriesCount(accessories.accessories().size());
+            
+            message.append("\n📝 **To enquire about any accessory, type the number (e.g., '1' for the first item)**");
         }
 
         ChatResponse response = new ChatResponse();
-        response.setSessionId(sessionId);
+        response.setSessionId(session.getSessionId());
         response.setSuccess(true);
         response.setTimestamp(LocalDateTime.now());
         response.setMessage(message.toString());
@@ -405,11 +470,11 @@ public class ChatbotService {
         response.setConversationEnd(false);
         response.setConversationType("accessories_result");
 
-        saveChatMessage(sessionId, "Accessories display", message.toString(), "getAccessoriesFilteredFunction", null);
+        saveChatMessage(session.getSessionId(), "Accessories display", message.toString(), "getAccessoriesFilteredFunction", null);
         return response;
     }
 
-    private ChatResponse createLocationSelectionResponse(String sessionId) {
+    private ChatResponse createLocationSelectionResponse(SessionData session) {
         try {
             logger.info("API CALL: getStatesFunction");
             StatesResponse states = mobisApiService.getStates();
@@ -428,7 +493,7 @@ public class ChatbotService {
             message.append("\n💡 *You can also type your city name directly.*");
 
             ChatResponse response = new ChatResponse();
-            response.setSessionId(sessionId);
+            response.setSessionId(session.getSessionId());
             response.setSuccess(true);
             response.setTimestamp(LocalDateTime.now());
             response.setMessage(message.toString());
@@ -437,15 +502,15 @@ public class ChatbotService {
             response.setConversationEnd(false);
             response.setConversationType("location_selection");
 
-            saveChatMessage(sessionId, "Location selection prompt", message.toString(), "getStatesFunction", null);
+            saveChatMessage(session.getSessionId(), "Location selection prompt", message.toString(), "getStatesFunction", null);
             return response;
         } catch (Exception e) {
             logger.error("Error getting states: {}", e.getMessage());
-            return createErrorResponse(sessionId, "Sorry, I couldn't retrieve the location information. Please try again.");
+            return createErrorResponse(session.getSessionId(), "Sorry, I couldn't retrieve the location information. Please try again.");
         }
     }
 
-    private ChatResponse createOffersResponse(String sessionId) {
+    private ChatResponse createOffersResponse(SessionData session) {
         try {
             logger.info("API CALL: getOffersFunction");
             OffersResponse offers = mobisApiService.getCurrentOffers(new OffersRequest("accessories", "all", null));
@@ -464,7 +529,7 @@ public class ChatbotService {
             }
 
             ChatResponse response = new ChatResponse();
-            response.setSessionId(sessionId);
+            response.setSessionId(session.getSessionId());
             response.setSuccess(true);
             response.setTimestamp(LocalDateTime.now());
             response.setMessage(message.toString());
@@ -477,17 +542,17 @@ public class ChatbotService {
             response.setConversationEnd(false);
             response.setConversationType("offers");
 
-            saveChatMessage(sessionId, "Offers request", message.toString(), "getOffersFunction", null);
+            saveChatMessage(session.getSessionId(), "Offers request", message.toString(), "getOffersFunction", null);
             return response;
         } catch (Exception e) {
             logger.error("Error getting offers: {}", e.getMessage());
-            return createErrorResponse(sessionId, "Sorry, I couldn't retrieve the current offers. Please try again.");
+            return createErrorResponse(session.getSessionId(), "Sorry, I couldn't retrieve the current offers. Please try again.");
         }
     }
 
-    private ChatResponse createProductSupportResponse(String sessionId) {
+    private ChatResponse createProductSupportResponse(SessionData session) {
         ChatResponse response = new ChatResponse();
-        response.setSessionId(sessionId);
+        response.setSessionId(session.getSessionId());
         response.setSuccess(true);
         response.setTimestamp(LocalDateTime.now());
         response.setMessage("🔧 **Product Support & Warranty**\n\n" +
@@ -507,13 +572,13 @@ public class ChatbotService {
         response.setConversationEnd(false);
         response.setConversationType("product_support");
 
-        saveChatMessage(sessionId, "Product support request", response.getMessage(), null, null);
+        saveChatMessage(session.getSessionId(), "Product support request", response.getMessage(), null, null);
         return response;
     }
 
-    private ChatResponse createInvalidSelectionResponse(String sessionId) {
+    private ChatResponse createInvalidSelectionResponse(SessionData session) {
         ChatResponse response = new ChatResponse();
-        response.setSessionId(sessionId);
+        response.setSessionId(session.getSessionId());
         response.setSuccess(true);
         response.setTimestamp(LocalDateTime.now());
         response.setMessage("I didn't understand that selection. Let me show you the available options:");
@@ -524,14 +589,14 @@ public class ChatbotService {
                 "Check Current Offers",
                 "Get Product Support"
         ));
-        response.setConversationEnd(false);
+                response.setConversationEnd(false);
         response.setConversationType("main_menu");
 
-        saveChatMessage(sessionId, "Invalid selection", response.getMessage(), null, null);
+        saveChatMessage(session.getSessionId(), "Invalid selection", response.getMessage(), null, null);
         return response;
     }
 
-    private ChatResponse createDealersForLocationResponse(String sessionId, String location) {
+    private ChatResponse createDealersForLocationResponse(SessionData session, String location) {
         try {
             logger.info("API CALL: findDealersFunction (location: {})", location);
             DealerSearchRequest request = new DealerSearchRequest(location, null, null, null, 0.0, 0.0, 50);
@@ -552,7 +617,7 @@ public class ChatbotService {
             }
 
             ChatResponse response = new ChatResponse();
-            response.setSessionId(sessionId);
+            response.setSessionId(session.getSessionId());
             response.setSuccess(true);
             response.setTimestamp(LocalDateTime.now());
             response.setMessage(message.toString());
@@ -566,11 +631,11 @@ public class ChatbotService {
             response.setConversationEnd(false);
             response.setConversationType("dealers_result");
 
-            saveChatMessage(sessionId, "Dealers in " + location, message.toString(), "findDealersFunction", null);
+            saveChatMessage(session.getSessionId(), "Dealers in " + location, message.toString(), "findDealersFunction", null);
             return response;
         } catch (Exception e) {
             logger.error("Error getting dealers for {}: {}", location, e.getMessage());
-            return createErrorResponse(sessionId, "Sorry, I couldn't retrieve the dealers in " + location + ". Please try again.");
+            return createErrorResponse(session.getSessionId(), "Sorry, I couldn't retrieve the dealers in " + location + ". Please try again.");
         }
     }
 
@@ -678,58 +743,22 @@ public class ChatbotService {
     }
 
     // Additional handler in handleOptionSelection for navigation
-    private ChatResponse handleNavigationOption(String sessionId, String option) {
+    private ChatResponse handleNavigationOption(SessionData session, String option) {
         if (option.equalsIgnoreCase("Browse Another Category")) {
-            String modelName = sessionState.get(sessionId + "_model");
-            if (modelName != null) {
-                return createTypeSelectionResponse(sessionId, modelName);
+            SessionData.ModelInfo model = session.getSelectedModel();
+            if (model != null) {
+                return createTypeSelectionResponse(session, model.getName());
             }
         } else if (option.equalsIgnoreCase("Start over")) {
             // Clear session state
-            sessionState.entrySet().removeIf(entry -> entry.getKey().startsWith(sessionId));
-            return createConversationStartResponse(sessionId);
+            session.resetFlow();
+            return createConversationStartResponse(session);
         }
-        return createConversationStartResponse(sessionId);
-    }
-
-    // Update handleOptionSelection to include navigation handling
-    private ChatResponse handleOptionSelectionEnhanced(ChatRequest request) {
-        String userMessage = request.getMessage().trim();
-        String sessionId = request.getSessionId();
-
-        logger.info("Handling option selection: [{}]", userMessage);
-
-        // Check for navigation options first
-        if (isNavigationOption(userMessage)) {
-            return handleNavigationOption(sessionId, userMessage);
-        }
-
-        // Main menu options
-        if (userMessage.equalsIgnoreCase("Browse Accessories")) {
-            sessionState.put(sessionId, "awaiting_vehicle_selection");
-            return createVehicleSelectionResponse(sessionId);
-        } else if (userMessage.equalsIgnoreCase("Find Dealers & Distributors")) {
-            sessionState.put(sessionId, "awaiting_location_selection");
-            return createLocationSelectionResponse(sessionId);
-        } else if (userMessage.equalsIgnoreCase("Check Current Offers")) {
-            return createOffersResponse(sessionId);
-        } else if (userMessage.equalsIgnoreCase("Get Product Support")) {
-            return createProductSupportResponse(sessionId);
-        } else if (userMessage.equalsIgnoreCase("Find Distributors")) {
-            return createDistributorsResponse(sessionId);
-        }
-
-        // Handle numeric selection
-        if (userMessage.matches("^\\d+$")) {
-            int selection = Integer.parseInt(userMessage);
-            return handleNumericSelection(selection, sessionId);
-        }
-
-        return createInvalidSelectionResponse(sessionId);
+        return createConversationStartResponse(session);
     }
 
     // Add distributor response method
-    private ChatResponse createDistributorsResponse(String sessionId) {
+    private ChatResponse createDistributorsResponse(SessionData session) {
         try {
             logger.info("API CALL: findDistributorsFunction");
             DealerSearchRequest request = new DealerSearchRequest("", null, null, null, 0.0, 0.0, 50);
@@ -750,7 +779,7 @@ public class ChatbotService {
             }
 
             ChatResponse response = new ChatResponse();
-            response.setSessionId(sessionId);
+            response.setSessionId(session.getSessionId());
             response.setSuccess(true);
             response.setTimestamp(LocalDateTime.now());
             response.setMessage(message.toString());
@@ -764,23 +793,34 @@ public class ChatbotService {
             response.setConversationEnd(false);
             response.setConversationType("distributors_result");
 
-            saveChatMessage(sessionId, "Distributors request", message.toString(), "findDistributorsFunction", null);
+            saveChatMessage(session.getSessionId(), "Distributors request", message.toString(), "findDistributorsFunction", null);
             return response;
         } catch (Exception e) {
             logger.error("Error getting distributors: {}", e.getMessage());
-            return createErrorResponse(sessionId, "Sorry, I couldn't retrieve the distributor information. Please try again.");
+            return createErrorResponse(session.getSessionId(), "Sorry, I couldn't retrieve the distributor information. Please try again.");
         }
     }
 
     // Clear session data method
     public void clearSessionData(String sessionId) {
-        sessionState.entrySet().removeIf(entry -> entry.getKey().startsWith(sessionId));
+        sessions.remove(sessionId);
     }
 
     // Get session info method for debugging
-    public Map<String, String> getSessionInfo(String sessionId) {
-        return sessionState.entrySet().stream()
-                .filter(entry -> entry.getKey().startsWith(sessionId))
-                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+    public Map<String, Object> getSessionInfo(String sessionId) {
+        SessionData session = sessions.get(sessionId);
+        if (session != null) {
+            Map<String, Object> info = new HashMap<>();
+            info.put("sessionId", session.getSessionId());
+            info.put("currentState", session.getCurrentState());
+            info.put("isAccessoryFlow", session.isAccessoryFlow());
+            info.put("flowStage", session.getFlowStage());
+            info.put("isInEnquiryFlow", session.isInEnquiryFlow());
+            info.put("hasSelectedModel", session.getSelectedModel() != null);
+            info.put("hasSelectedAccessory", session.getSelectedAccessory() != null);
+            info.put("enquiryStage", session.getEnquiryStage());
+            return info;
+        }
+        return Collections.emptyMap();
     }
 }
