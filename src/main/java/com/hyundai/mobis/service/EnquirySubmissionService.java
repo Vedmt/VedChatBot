@@ -3,6 +3,8 @@ package com.hyundai.mobis.service;
 import com.hyundai.mobis.dto.EnquiryForm;
 import com.hyundai.mobis.model.EnquiryEntity;
 import com.hyundai.mobis.repository.EnquiryRepository;
+import lombok.Builder;
+import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;

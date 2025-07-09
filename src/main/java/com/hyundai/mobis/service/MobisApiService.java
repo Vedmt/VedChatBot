@@ -1,16 +1,7 @@
 package com.hyundai.mobis.service;
 
 import com.hyundai.mobis.config.HyundaiMobisConfig;
-import com.hyundai.mobis.dto.DealerSearchRequest;
-import com.hyundai.mobis.dto.DealerSearchResponse;
-import com.hyundai.mobis.dto.PartSearchRequest;
-import com.hyundai.mobis.dto.PartSearchResponse;
-import com.hyundai.mobis.dto.MobisAccessoriesRequest;
-import com.hyundai.mobis.dto.MobisAccessoriesResponse;
-import com.hyundai.mobis.dto.AccessoryTypesResponse;
-import com.hyundai.mobis.dto.AccessorySubTypesResponse;
-import com.hyundai.mobis.dto.StatesResponse;
-import com.hyundai.mobis.dto.DistributorInfo;
+import com.hyundai.mobis.dto.*;
 import org.springframework.core.ParameterizedTypeReference;
 import com.hyundai.mobis.functions.MobisApiFunctions.OffersRequest;
 import com.hyundai.mobis.functions.MobisApiFunctions.OffersResponse;
@@ -21,6 +12,7 @@ import com.hyundai.mobis.functions.MobisApiFunctions.VehicleInfoResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -71,7 +63,7 @@ public class MobisApiService {
             );
             return response.getBody();
         } catch (Exception e) {
-            log.error("Error fetching dealer states", e);
+            logger.error("Error fetching dealer states", e);
             return new ArrayList<>();
         }
     }
@@ -87,7 +79,7 @@ public class MobisApiService {
             );
             return response.getBody();
         } catch (Exception e) {
-            log.error("Error fetching distributor states", e);
+            logger.error("Error fetching distributor states", e);
             return new ArrayList<>();
         }
     }
@@ -106,7 +98,7 @@ public class MobisApiService {
             );
             return response.getBody();
         } catch (Exception e) {
-            log.error("Error fetching cities for state: " + stateId, e);
+            logger.error("Error fetching cities for state: " + stateId, e);
             return new ArrayList<>();
         }
     }
@@ -125,7 +117,7 @@ public class MobisApiService {
             );
             return response.getBody();
         } catch (Exception e) {
-            log.error("Error fetching dealers for city: " + cityId, e);
+            logger.error("Error fetching dealers for city: " + cityId, e);
             return new ArrayList<>();
         }
     }
@@ -390,15 +382,6 @@ public class MobisApiService {
         }
     }
 
-    @Cacheable(value = "distributorStates", key = "'all'")
-    public StatesResponse getDistributorStates() {
-        try {
-            String url = baseUrl + "/service/accessories/getDistributorStates";
-            return createMockDistributorStatesResponse();
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to get distributor states", e);
-        }
-    }
 
     // All mock data creation methods remain the same
     private PartSearchResponse createMockPartSearchResponse(PartSearchRequest request) {
